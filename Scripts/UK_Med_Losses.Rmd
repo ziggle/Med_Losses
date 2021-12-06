@@ -1,0 +1,175 @@
+---
+title: "UK Med Losses Scraping"
+author: "Mark Biegert"
+header-includes:
+   - \usepackage{graphicx}
+date: "12/2/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Introduction
+
+This worksheet scrapes UK ship loss data from a web page with OCRed data from an official publicatoini called "British Vessels Lost at Sea, 1935-45", published by HMSO in 1947. The scraping operating was routine, though there were quite a few typos that needed to be fixed.
+
+```{r setup, echo=F, message=F}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(tidyr)
+library(dplyr)
+library(stringr)
+library(lubridate)
+library(kableExtra)
+library(janitor)
+library(rvest)
+library(knitr)
+library(graphics)
+library(kableExtra)
+library(ggplot2)
+library(hrbrthemes)
+library(ggthemes)
+library(extrafont)
+#font_import()
+#loadfonts(device = "win")
+#fonttable()
+```
+
+```{r global-options, include=FALSE}
+   knitr::opts_chunk$set(
+        echo = FALSE,
+        message = FALSE,
+        collapse=FALSE,
+        warning = FALSE,
+        results='asis'
+    )
+```
+
+# Background
+
+Drach's comment was about warships. UK losses in the Med are in the many hundreds if you include all the landing craft and auxiliary vessels. I chose to keep only warships starting with the sloop and corvette types. Here are the classes that I kept.
+
+* Aircraft Carrier
+* Battleship
+* Corvette
+* Cruiser				
+* Destroyer
+* Monitor	
+* Sloop		
+* Submarine				
+		
+```{r scrape_losses, echo=F, message=F}
+  url = "https://www.naval-history.net/WW2BritishLossesbyArea08.htm"
+  general_tmp <- url %>%
+  read_html()
+  
+```
+
+``` {r one_more,echo=F, message=F}
+   xpath_ = general_tmp %>%
+   html_nodes(xpath="//table/tbody/tr/td/blockquote/p") %>%
+   html_text2() %>% 
+   str_squish() %>% 
+   str_trim()
+
+xpath_ =xpath_[xpath_ != ""][3:462]
+xpath_ = xpath_ %>% str_replace("Landing craft assault LCA No.70","January 1 - Landing craft assault LCA No.70")
+xpath_= xpath_ %>% str_replace("Landing craft assault LCA No.326","January 1 - Landing craft assault LCA No.326")
+xpath_ = xpath_ %>% str_replace("August-September","August 1")
+xpath_ = xpath_ %>% str_replace("criser","cruiser")
+xpath_ = xpath_ %>% str_replace("BYMS Minesweeper","Minesweeper")
+```
+
+```{r form_date, echo=F, message=F, warnings=F}
+
+raw = tibble(src = xpath_)
+dsplit = raw %>% separate(src, c("month", "other"), " - ")
+ship_type = dsplit %>% 
+            mutate(type = word(other,1)) %>% 
+            distinct(type)
+with_year = dsplit %>% 
+            mutate(year = ifelse(is.na(other),month, NA)) %>% 
+            fill(year) %>% 
+            filter(!is.na(other))
+
+clean_month = with_year %>% 
+            separate(month,c("month",NA))
+
+with_date   = clean_month %>% 
+              mutate(dt = paste0(month," 1, ",year)) %>% 
+              mutate(dt = mdy(dt)) %>% 
+              select(date = dt, other)
+
+remove.list = c("Motor","Trawler","Tug","Landing","Yacht","Whaler","Drifter","Human","Water","River","Harbour","Salvage","Boom","Store","Transport","Tanker/oiler","Convoy","Armament","Auxiliary","Small","Armed","Mooring","Schooner","Minelayer ","Minesweeper ")
+warships = with_date %>% filter(!word(other,1) %in% remove.list)
+parse = warships %>% 
+        mutate(name1 = str_replace(other, "([A-Z]{2,})", "|\\1")) %>% 
+        mutate(name2 = str_replace(name1," \\(","|\\(")) %>% 
+        mutate(name3 = str_replace(name2,"\\),","\\)|")) %>%
+        mutate(name4 = str_replace(name3,"P-","|P-")) %>% 
+        mutate(name5 = str_replace(name4,"No.","|No.")) %>% 
+        mutate(name5 = str_replace(name5, 'Cruiser minelayer','Minelayer')) %>% 
+        mutate(name5 = str_to_title(name5)) %>% 
+        mutate(name5 = str_trim(name5, side='both'))
+
+parse2 = parse %>% 
+        separate(col = name5, into=c('Type','Name',NA),sep='\\|') %>% 
+        select(Date=date, Type, Name)  %>% 
+        filter(Type!="Submarine Depot Ship ") %>% 
+        filter(Type!='Cutter ') %>% 
+        filter(Type!="Minelayer ") %>% 
+        filter(Type!="Minesweeper ")
+
+
+```
+
+```{r consolidate, echo=F, message=F}
+
+consolidate = parse2 %>% 
+     mutate(Type=str_replace(Type,'Light Cruiser','Cruiser')) %>% 
+     mutate(Type=str_replace(Type, 'Escort Destroyer','Destroyer'))
+
+```
+
+# Analysis
+
+## Graphic
+
+I first construct a stacked bar chart to look at what years the ship losses occurred.
+
+
+```{r graphic, echo=F, message=F, warnings=F}
+final = consolidate %>% 
+        transmute(Year=year(Date), Type, Name) %>% 
+        group_by(Year, Type) 
+
+p1 = ggplot(final, aes(x = factor(Year), fill=factor(Type, levels=c("Monitor ", "Battleship ","Aircraft Carrier ","Sloop ", "Corvette ", "Cruiser ","Mine Warfare ","Submarine ","Destroyer ")))) + 
+  geom_bar()+
+  guides(fill=guide_legend(title="Ship Type"))+
+  
+  scale_fill_manual(values = c("Red","Gray","Orange","Black","Brown","Blue","Pink","Green"))+
+  ylab('Ships Sunk')+
+  xlab('Year')+
+  labs(title="UK WW2 Med Losses", subtitle="Breakdown by Year and Ship Type", caption="https://www.naval-history.net/WW2BritishLosses5Support.htm")+
+  scale_x_discrete(labels = c('1940','1941','1942','1943','1944'))+
+  theme_ipsum()
+
+p1
+
+```
+
+## Tabular Data
+
+The following table shows my summary of the ship losses in tabular form.
+
+```{r tabular, echo=F, message=F}
+x = tabyl(final,Type)
+y=x %>% arrange(desc(n)) %>% adorn_totals() %>% 
+  mutate(percent = scales::percent(percent)) 
+y %>%  kable(col.names=c("Type","Number","Percent")) %>%   kable_styling(c("bordered","condensed"),
+                latex_options = c("hold_position"), 
+                font_size = 14,
+                full_width = F)
+
+```
+

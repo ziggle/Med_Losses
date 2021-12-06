@@ -1,0 +1,4 @@
+"0","  url = ""https://www.naval-history.net/WW2BritishLossesbyArea08.htm"""
+"0","  general_tmp <- url %>%"
+"0","  read_html()"
+"0","  "

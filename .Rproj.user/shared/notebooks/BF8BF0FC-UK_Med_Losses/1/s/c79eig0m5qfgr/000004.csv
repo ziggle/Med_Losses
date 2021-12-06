@@ -1,0 +1,7 @@
+"0","x = tabyl(final,Type)"
+"0","y=x %>% arrange(desc(n)) %>% adorn_totals() %>% "
+"0","  mutate(percent = scales::percent(percent)) "
+"0","y %>%  kable(col.names=c(""Type"",""Number"",""Percent"")) %>%   kable_styling(c(""bordered"",""condensed""),"
+"0","                latex_options = c(""hold_position""), "
+"0","                font_size = 14,"
+"0","                full_width = F)"

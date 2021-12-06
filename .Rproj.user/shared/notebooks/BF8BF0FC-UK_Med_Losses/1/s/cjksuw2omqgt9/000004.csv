@@ -1,0 +1,6 @@
+"0",""
+"0","consolidate = parse2 %>% "
+"0","     mutate(Type=str_replace(Type,'Light Cruiser','Cruiser')) %>% "
+"0","     mutate(Type=str_replace(Type, 'Escort Destroyer','Destroyer'))"
+"0",""
+"0","consolidate %>% distinct(Type)"

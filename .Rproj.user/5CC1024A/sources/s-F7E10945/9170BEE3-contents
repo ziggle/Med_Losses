@@ -1,0 +1,208 @@
+---
+title: 'Civil War Casualty Comparison: Grant vs Lee'
+author: "Mark Biegert"
+header-includes:
+   - \usepackage{graphicx}
+date: "5/2/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(tidyr)
+library(dplyr)
+library(stringr)
+library(lubridate)
+library(pivottabler)
+library(kableExtra)
+library(janitor)
+library(rvest)
+library(haven)
+library(knitr)
+library(gtsummary)
+library(graphics)
+
+
+
+```
+
+```{r global-options, include=FALSE}
+   knitr::opts_chunk$set(
+        echo = FALSE,
+        message = FALSE,
+        collapse=FALSE,
+        warning = FALSE,
+        results='asis'
+    )
+```
+
+# Introduction
+
+This worksheet explores the number of casualties by battle and general in charge. The casualty data is obtained from Jeffrey Arnold's [Github site](https://github.com/jrnold/acw_battle_data/tree/master/build/acw_battle_data) that has an amazing amount of information on the US Civil War. 
+
+I decided to use his file that contains Wikipedia data on Civil War casualties by battle. The Wikipedia often gives ranges for casualties. When it does, I averaged the min and max values of the range.
+
+Arnold's file does not contain information on the generals running the battle. I obtained this data by scraping it from the Wikipedia's Civil War battle pages. This scraping is included in this document. The scraping is time-consuming and slows the execution of the file.
+
+# Background
+
+## Ulysses S. Grant
+
+I find Ulysses Grant is one of the most interesting people in US history. He is a man who struggled to succeed in the pre-war civilian society, but uniquely excelled as a general in the Union Army. He was a man who shunned pomp and circumstance. His wartime photos invariable show him wearing a simple uniform in an informal setting. He wrote a post-war memoir that is considered the finest US presidential memoir ever written.
+
+His reputation came under heavy assault by post-war writers who accused him of being a butcher. In fact, his memoir mentioned his regrets at aspects of the [Battle of Cold Harbor](https://en.wikipedia.org/wiki/Battle_of_Cold_Harbor) and the heavy casualties that assault endured. Others argue that if his strategy had been adopted earlier by other Union generals the war could have been considerably shortened. In fact, Grant is considered a master strategist.
+
+<center>![alt text here](..\\Images\515px-Grant_crop_of_Cold_Harbor_photo.png){width=200px}</center>
+
+
+## Robert E. Lee
+
+Robert E. Lee is one of the most famous of all US Generals. He was a master tactician, though has been criticized for his lack of a strategy to actually win the war and issues with logistics. He was considered a patrician gentleman and spent his few remaining years after the war as the head of Washington University, a school that was nearly bankrupt and he saved. By all accounts, he was an excellent academic administrator.
+
+Lee was venerated as a military genius after the war and has developed an almost cult-like following. 
+
+<center>![alt text here](..\\Images\324px-Robert_Edward_Lee.jpg){width=200px}</center>
+
+
+# Bonekemper Analysis
+
+I pulled in the Bonekemper data for my reference data. The tables are big, so I will just present the final summary. Bonekemper argues that more men died under Lee as a general than under Grant. There are issues with making that claim because:
+
+* Lee was in fighting fighting major battles longer and can be expected to have higher casualties.
+* Grant started fighting in the western theater, where battle casualties tended to be lower. Why were the casualties lower? I don't know. 
+
+A summary of Bonekemper's data is shown below.
+
+```{r bonekemper_summary, echo=F, messages=F}
+grant_b = read.delim("..\\Data\\grant.txt", header=FALSE)
+colnames(grant_b)=c("Battle",'Confederate', "Union")
+lee_b = read.delim("..\\Data\\lee.txt", header=FALSE)
+colnames(lee_b)=c("Battle",'Confederate',"Union")
+gen = bind_rows(grant_b %>% mutate(General="Grant"), lee_b %>% mutate(General='Lee'))
+gg = gen %>% group_by(General) %>% summarise(Confederate = sum(Confederate), Union = sum(Union))
+gg  %>%  kable() %>% kable_styling(c("bordered","condensed"),
+                latex_options = c("hold_position"), 
+                font_size = 10,
+                full_width = F)
+
+```
+
+# Casualty Data Gathering
+
+This section reads in the data from the Github site and sums the numeric data to get the total casualties.
+```{r read_data, echo=FALSE, include=F}
+
+incidents = read.csv("https://raw.githubusercontent.com/jrnold/acw_battle_data/master/build/acw_battle_data/wikipedia_forces.csv", header=TRUE,stringsAsFactors=F)
+```
+
+# Analysis
+
+## Format Casualty Data 
+
+This section generates the data table with only the information required for this analysis.
+
+```{r cleanup_incidents, echo=F, include=T}
+clean = incidents %>%
+            select(-strength_max,-strength_min) %>%
+            replace(is.na(.), 0) %>%
+            mutate(sum = 0.5*rowSums(across(where(is.numeric)))) %>%
+            select(Battle=battle_id, Nation = belligerent, Casualties=sum) %>%
+            mutate(Battle = str_replace_all(Battle, "_"," ")) %>%
+            pivot_wider(id_cols="Battle",names_from="Nation",values_from="Casualties") %>%
+            select(-"Native American") %>%
+            mutate(US = ceiling(replace_na(US,0)), Confederate=ceiling(replace_na(Confederate,0)))
+ 
+```
+
+## Scrape General Data from the Wikipedia
+
+I gather all the Union and Confederate  generals listed for the battles in the Arnold casualty file.
+
+```{r scrape_generals, echo=F, message=F}
+inc = incidents %>% filter(belligerent =='US')
+prefix ="https://en.wikipedia.org/wiki/"
+cnf = list()
+uni = list()
+for (x in inc$battle_id){
+  url=paste0(prefix,x)
+  general_tmp <- url %>%
+  read_html()
+
+  union_gen = general_tmp %>%
+  html_nodes(xpath="//table[@class='infobox vevent']/tbody/tr[th='Commanders and leaders']/following-sibling::tr[1]/td[1]") %>%
+  html_text()
+  uni = append(uni, list(union_gen))
+  conf_gen = general_tmp %>%
+  html_nodes(xpath="//table[@class='infobox vevent']/tbody/tr[th='Commanders and leaders']/following-sibling::tr[1]/td[2]") %>%
+  html_text()
+  cnf =append(cnf,list(conf_gen))
+}
+
+```
+
+## Battles for Lee and Grant
+
+```{r filter4LeeAndGrant, echo=F}
+zxc = tibble(General=cnf)
+zxd = tibble(General=uni)
+
+lee = clean[sapply(zxc, function(x) grepl("E. Lee",x)),]
+grant=clean[sapply(zxd, function(x) grepl("Grant",x)),]
+
+``` 
+
+## Lee Casualties
+
+The following table contains the Civil War battles that Lee is listed on the Wikipedia as a general. Lee took over command of the Army of Northern Virginia after Johnston was wounded at the Battle of Seven Pines and kept that command for the rest of war.
+
+```{r read_in_lee, echo=F}
+
+lee %>% adorn_totals()%>% 
+  kable() %>%  
+  kable_styling(c("bordered","condensed"),
+                latex_options = c("hold_position"), 
+                font_size = 10,
+                full_width = F)
+```
+
+## Grant Caualties
+
+The following table contains the Civil War battles that Grant is listed on the Wikipedia as a general. In some of these battles, Grant was not the top general, but I listed those battles anyway.
+
+```{r grant, echo=F}
+
+grant %>% adorn_totals()%>% 
+  kable() %>% 
+  kable_styling(c("bordered","condensed"),
+                latex_options = c("hold_position"), 
+                font_size = 10,
+                full_width = F)
+```
+
+# Casualty Summary
+
+The following table summarizes my scraping results.
+
+```{r combined, echo=F}
+lee = lee %>%
+          mutate(General = 'Lee')
+grant = grant %>%
+          mutate(General = 'Grant')
+
+
+combine = lee %>%
+          bind_rows(grant) %>%
+          group_by(General) %>%
+          summarize(Confederate = sum(Confederate), US= sum(US))
+
+combine %>% kable() %>%  
+  kable_styling(c("bordered","condensed"),
+                latex_options = c("hold_position"), 
+                font_size = 10,
+                full_width = F)
+```
+
+
