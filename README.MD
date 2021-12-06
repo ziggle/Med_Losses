@@ -33,19 +33,19 @@
     <img src="Images/1080px-Fritz_X_Guided_Bomb.jpg" alt="Logo" width="80" height="80">
   </a>
 
-<h3 align="center">project_title</h3>
+<h3 align="center">UK WW2 Warship Losses in the Mediterranean</h3>
 
   <p align="center">
-    project_description
+    This is a simple web scraping exercise that results in a list of UK warships losses during WW2 during the Battle of the Mediterranean.
     <br />
     <a href="https://github.com/github_username/repo_name"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/github_username/repo_name">View Demo</a>
+    <a href="https://github.com/ziggle/Med_Losses">View Demo</a>
     ·
-    <a href="https://github.com/github_username/repo_name/issues">Report Bug</a>
+    <a href="https://github.com/ziggle/Med_Losses/issues">Report Bug</a>
     ·
-    <a href="https://github.com/github_username/repo_name/issues">Request Feature</a>
+    <a href="hhttps://github.com/ziggle/Med_Losses/issues">Request Feature</a>
   </p>
 </div>
 
@@ -58,7 +58,9 @@
     <li>
       <a href="#about-the-project">About The Project</a>
       <ul>
-        <li><a href="#built-with">Built With</a></li>
+        <li>Project is intended to be a tutorial example of how to scrape a web page using Rvest and Rmarkdown</li>
+        <li><a href="#built-with">This project was developed in Rstudio using Rmarkdown.</a></li>
+        <li><a href="https://www.naval-history.net/WW2BritishLossesbyArea08.htm">Web page being scraped</a></li>
       </ul>
     </li>
     <li>
